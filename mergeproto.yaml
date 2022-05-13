@@ -1,0 +1,6 @@
+main_proto: idl/trpc/idac_authen_vo/idac_authen_vo.proto
+additional_message:
+  - fit.idac.PersData
+additional_enum:
+  - fit.idac.IdType
+  - fit.idac.PersDataFieldEnum
