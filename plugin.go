@@ -93,6 +93,13 @@ func (pi *Plugin) merge(pf *protokit.PKFileDescriptor,
 	msgs := make([]*protokit.PKDescriptor, 0)
 	msgs = append(msgs, pf.GetMessages()...)
 
+	for _, service := range pf.GetServices() {
+		for _, method := range service.GetMethods() {
+			msgs = append(msgs, FindMessage(files, method.GetInputType()))
+			msgs = append(msgs, FindMessage(files, method.GetOutputType()))
+		}
+	}
+
 	for _, am := range pi.Opts.AdditionalMessage {
 		m := FindMessage(files, am)
 		if m != nil {
@@ -153,12 +160,22 @@ func (pi *Plugin) merge(pf *protokit.PKFileDescriptor,
 		}
 	}
 
+	enumDone := make(map[string]struct{})
 	for _, enum := range enums {
+		if _, ok := enumDone[enum.GetFullName()]; ok {
+			continue
+		}
 		pb.WriteString(WithComments(pi.GenEnumDefine(enum), enum.Comments, 0))
+		enumDone[enum.GetFullName()] = struct{}{}
 	}
 
+	msgDone := make(map[string]struct{})
 	for _, msg := range msgs {
+		if _, ok := msgDone[msg.GetFullName()]; ok {
+			continue
+		}
 		pb.WriteString(WithComments(pi.GenMessageDefine(msg), msg.Comments, 0))
+		msgDone[msg.GetFullName()] = struct{}{}
 	}
 
 	rf.Content = proto.String(pb.String())
@@ -181,7 +198,7 @@ func (pi *Plugin) GenServiceDefine(service *protokit.PKServiceDescriptor) string
 
 func (pi *Plugin) GenMessageDefine(msg *protokit.PKDescriptor) string {
 	sb := new(strings.Builder)
-	sb.WriteString(fmt.Sprintf("message %s {\n", msg.GetName()))
+	sb.WriteString(fmt.Sprintf("message %s {\n", pi.ReplacePackage(msg.GetFullName())))
 	for _, subMsg := range msg.GetMessages() {
 		sb.WriteString(Indent(WithComments(pi.GenMessageDefine(subMsg), subMsg.Comments, 4), 4))
 	}
@@ -197,7 +214,7 @@ func (pi *Plugin) GenMessageDefine(msg *protokit.PKDescriptor) string {
 }
 func (pi *Plugin) GenEnumDefine(enum *protokit.PKEnumDescriptor) string {
 	sb := new(strings.Builder)
-	sb.WriteString(fmt.Sprintf("enum %s {\n", enum.GetName()))
+	sb.WriteString(fmt.Sprintf("enum %s {\n", pi.ReplacePackage(enum.GetFullName())))
 	for _, val := range enum.GetValues() {
 		sb.WriteString(WithComments(fmt.Sprintf("    %s = %d;\n", val.GetName(), val.GetNumber()), val.Comments, 4))
 	}
@@ -229,5 +246,8 @@ func (pi *Plugin) GetStringLabel(label descriptorpb.FieldDescriptorProto_Label) 
 }
 
 func (pi *Plugin) ReplacePackage(name string) string {
-	return LastPart(name, ".")
+	if strings.HasPrefix(name, ".") {
+		name = name[1:]
+	}
+	return strings.Replace(name, ".", "_", -1)
 }
