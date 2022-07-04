@@ -17,6 +17,7 @@ type PluginOptions struct {
 	MainProto         string   `yaml:"main_proto"`
 	AdditionalMessage []string `yaml:"additional_message"`
 	AdditionalEnum    []string `yaml:"additional_enum"`
+	OmitPackageName   string   `yaml:"omit_package_name"`
 }
 
 func (po *PluginOptions) ParseOptions(parameter string) {
@@ -85,9 +86,6 @@ func (pi *Plugin) merge(pf *protokit.PKFileDescriptor,
 		pb.WriteString("option cc_generic_services = true;\n")
 	}
 
-	for _, service := range pf.GetServices() {
-		pb.WriteString(WithComments(pi.GenServiceDefine(service), service.Comments, 0))
-	}
 	enums := make([]*protokit.PKEnumDescriptor, 0)
 	enums = append(enums, pf.GetEnums()...)
 	msgs := make([]*protokit.PKDescriptor, 0)
@@ -102,19 +100,20 @@ func (pi *Plugin) merge(pf *protokit.PKFileDescriptor,
 
 	for _, am := range pi.Opts.AdditionalMessage {
 		m := FindMessage(files, am)
+		log.Printf("AdditionalMessage %s, m.GetFullName():%s\n", am, m.GetFullName())
 		if m != nil {
-			msgs = append(msgs)
+			msgs = append(msgs, m)
 		} else {
 			return nil, fmt.Errorf("message %s not found", am)
 		}
 	}
 
-	for _, am := range pi.Opts.AdditionalEnum {
-		m := FindEnum(files, am)
-		if m != nil {
-			enums = append(enums)
+	for _, ae := range pi.Opts.AdditionalEnum {
+		e := FindEnum(files, ae)
+		if e != nil {
+			enums = append(enums, e)
 		} else {
-			return nil, fmt.Errorf("enum %s not found", am)
+			return nil, fmt.Errorf("enum %s not found", ae)
 		}
 	}
 	for {
@@ -171,11 +170,16 @@ func (pi *Plugin) merge(pf *protokit.PKFileDescriptor,
 
 	msgDone := make(map[string]struct{})
 	for _, msg := range msgs {
+		log.Printf("FullName:%s done:%v", msg.GetFullName(), msgDone[msg.GetFullName()])
 		if _, ok := msgDone[msg.GetFullName()]; ok {
 			continue
 		}
 		pb.WriteString(WithComments(pi.GenMessageDefine(msg), msg.Comments, 0))
 		msgDone[msg.GetFullName()] = struct{}{}
+	}
+
+	for _, service := range pf.GetServices() {
+		pb.WriteString(WithComments(pi.GenServiceDefine(service), service.Comments, 0))
 	}
 
 	rf.Content = proto.String(pb.String())
@@ -248,6 +252,12 @@ func (pi *Plugin) GetStringLabel(label descriptorpb.FieldDescriptorProto_Label) 
 func (pi *Plugin) ReplacePackage(name string) string {
 	if strings.HasPrefix(name, ".") {
 		name = name[1:]
+	}
+	if strings.HasPrefix(name, pi.Opts.OmitPackageName) {
+		name = name[len(pi.Opts.OmitPackageName):]
+		if strings.HasPrefix(name, ".") {
+			name = name[1:]
+		}
 	}
 	return strings.Replace(name, ".", "_", -1)
 }
