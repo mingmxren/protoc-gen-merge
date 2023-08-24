@@ -17,7 +17,7 @@ type PluginOptions struct {
 	MainProto         string   `yaml:"main_proto"`
 	AdditionalMessage []string `yaml:"additional_message"`
 	AdditionalEnum    []string `yaml:"additional_enum"`
-	OmitPackageName   string   `yaml:"omit_package_name"`
+	OmitPackageName   []string `yaml:"omit_package_name"`
 }
 
 func (po *PluginOptions) ParseOptions(parameter string) {
@@ -253,10 +253,12 @@ func (pi *Plugin) ReplacePackage(name string) string {
 	if strings.HasPrefix(name, ".") {
 		name = name[1:]
 	}
-	if strings.HasPrefix(name, pi.Opts.OmitPackageName) {
-		name = name[len(pi.Opts.OmitPackageName):]
-		if strings.HasPrefix(name, ".") {
-			name = name[1:]
+	for _, omitPackageName := range pi.Opts.OmitPackageName {
+		if strings.HasPrefix(name, omitPackageName) {
+			name = name[len(omitPackageName):]
+			if strings.HasPrefix(name, ".") {
+				name = name[1:]
+			}
 		}
 	}
 	return strings.Replace(name, ".", "_", -1)

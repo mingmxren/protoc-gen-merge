@@ -1,6 +1,8 @@
-main_proto: idl/trpc/idac_authen_vo/idac_authen_vo.proto
+main_proto: some_dir/some_proto.proto
 additional_message:
-  - fit.idac.PersData
+  - some_package.some_message
 additional_enum:
-  - fit.idac.IdType
-  - fit.idac.PersDataFieldEnum
+  - some_package.some_enum
+omit_package_name:
+  - some_package
+  - some_package.some_sub_package
